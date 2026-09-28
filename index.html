@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>TOOL VIP · Dự Đoán Realtime</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #070b12;
+    --bg-card: #111d2d;
+    --bg-input: #0a121f;
+    --text-primary: #e6f0fa;
+    --text-secondary: #8aa4c0;
+    --text-dim: #4a6078;
+    --accent-cyan: #00f0d4;
+    --accent-purple: #a855f7;
+    --accent-pink: #f472b6;
+    --accent-gold: #fbbf24;
+    --accent-red: #f87171;
+    --accent-green: #22c55e;
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --radius-sm: 12px;
+    --font-display: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-mono: 'Consolas', 'Monaco', monospace;
+    --transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  html, body {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    overflow: hidden; touch-action: none; overscroll-behavior: none;
+    background: var(--bg-primary); font-family: var(--font-display);
+    color: var(--text-primary);
+    -webkit-user-select: none; user-select: none;
+  }
+
+  #bgCanvas {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none; display: block;
+  }
+
+  #gameFrame {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    width: 100dvw; height: 100dvh;
+    border: none; z-index: 1; display: none;
+    background: #000; pointer-events: auto;
+  }
+
+  #welcomeScreen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 1000; background: rgba(7, 11, 18, 0.96);
+    backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.7s cubic-bezier(0.23, 1, 0.32, 1), transform 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+    pointer-events: auto;
+  }
+  #welcomeScreen.hidden { opacity: 0; pointer-events: none; transform: scale(1.04); }
+
+  .welcome-card {
+    position: relative; width: 540px; max-width: 94vw;
+    background: var(--bg-card); border-radius: var(--radius-lg);
+    padding: 52px 44px 40px;
+    border: 1px solid rgba(0, 240, 212, 0.15);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 60px rgba(0, 240, 212, 0.12);
+    overflow: hidden; z-index: 1;
+  }
+  .welcome-card::before {
+    content: ''; position: absolute; top: -60%; left: -60%;
+    width: 220%; height: 220%;
+    background: radial-gradient(circle at 30% 40%, rgba(0, 240, 212, 0.04), transparent 60%),
+                radial-gradient(circle at 70% 70%, rgba(168, 85, 247, 0.04), transparent 50%);
+    pointer-events: none; animation: breatheGlow 8s ease-in-out infinite alternate;
+  }
+  @keyframes breatheGlow {
+    0% { transform: scale(1) rotate(0deg); opacity: 0.6; }
+    100% { transform: scale(1.1) rotate(6deg); opacity: 1; }
+  }
+  .welcome-content { position: relative; z-index: 2; text-align: center; }
+  .welcome-badge {
+    display: inline-block; background: rgba(0, 240, 212, 0.08);
+    border: 1px solid rgba(0, 240, 212, 0.2); border-radius: 50px;
+    padding: 6px 18px; font-size: 10px; font-weight: 700;
+    letter-spacing: 3px; text-transform: uppercase;
+    color: var(--accent-cyan); margin-bottom: 18px;
+  }
+  .welcome-icon {
+    font-size: 72px; line-height: 1; margin-bottom: 6px;
+    animation: floatIcon 4s ease-in-out infinite;
+  }
+  @keyframes floatIcon {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-14px) scale(1.04); }
+  }
+  .welcome-title {
+    font-size: 42px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(135deg, #00f0d4, #a855f7, #f472b6);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 2px;
+  }
+  .welcome-sub { font-size: 13px; color: var(--text-secondary); letter-spacing: 4px; font-weight: 300; margin-bottom: 4px; }
+  .welcome-sub span { color: var(--accent-gold); font-weight: 700; -webkit-text-fill-color: var(--accent-gold); }
+  .welcome-version { font-size: 11px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 28px; }
+  .welcome-version strong { color: var(--accent-cyan); font-weight: 700; }
+  .input-group { text-align: left; margin-bottom: 24px; }
+  .input-group label {
+    display: block; font-size: 10px; font-weight: 700; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--text-secondary); margin-bottom: 10px;
+  }
+  .input-wrap { position: relative; }
+  .input-wrap .input-icon {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    font-size: 18px; pointer-events: none; color: var(--text-dim); z-index: 1;
+  }
+  .input-wrap input {
+    width: 100%; padding: 16px 20px 16px 52px;
+    background: var(--bg-input); border: 2px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-md); color: var(--text-primary);
+    font-size: 15px; font-family: var(--font-mono); outline: none;
+    transition: var(--transition);
+  }
+  .input-wrap input:focus {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 6px rgba(0, 240, 212, 0.06), 0 0 40px rgba(0, 240, 212, 0.06);
+    background: #0c1626;
+  }
+  .input-wrap input:focus ~ .input-icon { color: var(--accent-cyan); }
+  .input-wrap input::placeholder { color: var(--text-dim); font-size: 13px; font-family: var(--font-display); }
+  .input-wrap input.error {
+    border-color: var(--accent-red);
+    box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.06);
+    animation: shake 0.5s ease;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-10px); }
+    40% { transform: translateX(10px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+  }
+  .btn-primary {
+    width: 100%; padding: 18px; border: none; border-radius: 50px;
+    font-weight: 800; font-size: 17px; text-transform: uppercase;
+    letter-spacing: 5px; cursor: pointer;
+    background: linear-gradient(135deg, #00f0d4, #a855f7);
+    color: #070b12;
+    box-shadow: 0 0 50px rgba(0, 240, 212, 0.3), 0 12px 32px rgba(0, 0, 0, 0.6);
+    transition: var(--transition); position: relative; overflow: hidden;
+    font-family: inherit;
+  }
+  .btn-primary:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 0 70px rgba(0, 240, 212, 0.45), 0 18px 44px rgba(0, 0, 0, 0.7);
+  }
+  .btn-primary:active { transform: scale(0.94); }
+  .btn-primary .shine {
+    position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+    transition: left 0.6s;
+  }
+  .btn-primary:hover .shine { left: 100%; }
+  .welcome-foot { margin-top: 18px; font-size: 10px; color: var(--text-dim); letter-spacing: 1.5px; }
+  .welcome-foot .hl { color: var(--accent-gold); font-weight: 700; }
+
+  /* Màn hình khóa */
+  #lockScreen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 2000; background: rgba(7, 11, 18, 0.98);
+    backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.5s, transform 0.5s;
+  }
+  #lockScreen.hidden { opacity: 0; pointer-events: none; transform: scale(1.05); }
+  .lock-card {
+    background: var(--bg-card); border-radius: var(--radius-lg);
+    padding: 44px 36px 36px; width: 400px; max-width: 92vw;
+    border: 1px solid rgba(0, 240, 212, 0.15);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 60px rgba(0, 240, 212, 0.1);
+    text-align: center;
+  }
+  .lock-icon { font-size: 56px; margin-bottom: 12px; animation: floatIcon 3s ease-in-out infinite; }
+  .lock-title {
+    font-size: 26px; font-weight: 900; letter-spacing: 3px;
+    background: linear-gradient(135deg, #00f0d4, #a855f7);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 8px;
+  }
+  .lock-sub { font-size: 12px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 26px; }
+  .lock-input {
+    width: 100%; padding: 16px 20px;
+    background: var(--bg-input); border: 2px solid rgba(0, 240, 212, 0.15);
+    border-radius: var(--radius-md); color: var(--text-primary);
+    font-size: 18px; font-family: var(--font-mono); outline: none;
+    text-align: center; letter-spacing: 4px;
+    transition: var(--transition); margin-bottom: 18px;
+  }
+  .lock-input:focus {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 6px rgba(0, 240, 212, 0.06), 0 0 40px rgba(0, 240, 212, 0.1);
+    background: #0c1626;
+  }
+  .lock-input.error {
+    border-color: var(--accent-red);
+    box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.06);
+    animation: shake 0.5s ease;
+  }
+  .lock-btn {
+    width: 100%; padding: 16px; border: none; border-radius: 50px;
+    font-weight: 800; font-size: 15px; text-transform: uppercase;
+    letter-spacing: 4px; cursor: pointer;
+    background: linear-gradient(135deg, #00f0d4, #a855f7);
+    color: #070b12;
+    box-shadow: 0 0 40px rgba(0, 240, 212, 0.3);
+    transition: var(--transition); font-family: inherit;
+  }
+  .lock-btn:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 0 60px rgba(0, 240, 212, 0.5); }
+  .lock-btn:active { transform: scale(0.96); }
+  .lock-msg {
+    margin-top: 14px; font-size: 12px; min-height: 18px;
+    font-weight: 700; letter-spacing: 1px;
+  }
+  .lock-msg.ok { color: var(--accent-green); }
+  .lock-msg.err { color: var(--accent-red); }
+
+  #toolToggle {
+    position: fixed; top: 20px; left: 20px; z-index: 999;
+    background: rgba(14, 22, 37, 0.94);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1.5px solid rgba(0, 240, 212, 0.4);
+    padding: 12px 22px; border-radius: 50px;
+    font-weight: 800; font-size: 13px; color: var(--accent-cyan);
+    cursor: pointer;
+    box-shadow: 0 0 30px rgba(0, 240, 212, 0.15), 0 8px 24px rgba(0, 0, 0, 0.6);
+    letter-spacing: 2px; text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+    transition: var(--transition); white-space: nowrap;
+    font-family: inherit; pointer-events: auto;
+    opacity: 0; transform: translateY(-12px) scale(0.92);
+  }
+  #toolToggle.active {
+    opacity: 1; transform: translateY(0) scale(1); pointer-events: auto;
+  }
+  #toolToggle:hover {
+    transform: translateY(-2px) scale(1.04);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 50px rgba(0, 240, 212, 0.3), 0 12px 32px rgba(0, 0, 0, 0.7);
+  }
+  .dot-live {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 20px var(--accent-cyan);
+    flex-shrink: 0; animation: pulseDot 1.4s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { box-shadow: 0 0 20px var(--accent-cyan); }
+    50% { box-shadow: 0 0 44px var(--accent-cyan), 0 0 70px rgba(0, 240, 212, 0.3); }
+  }
+
+  #toolPanel {
+    position: fixed; top: 80px; left: 20px; z-index: 998;
+    width: 540px; max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 110px);
+    overflow-y: auto; overflow-x: hidden;
+    background: linear-gradient(135deg, rgba(14, 22, 37, 0.98), rgba(10, 18, 30, 0.98));
+    backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+    border-radius: 24px; padding: 28px 24px 20px;
+    border: 2px solid rgba(0, 240, 212, 0.15);
+    box-shadow: 0 0 0 1px rgba(0, 240, 212, 0.08), 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 80px rgba(0, 240, 212, 0.06);
+    transform-origin: top left;
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    opacity: 0; transform: scale(0.85) translateY(-20px) rotate(-2deg);
+    pointer-events: none;
+  }
+  #toolPanel.open {
+    opacity: 1; transform: scale(1) translateY(0) rotate(0deg); pointer-events: auto;
+  }
+  #toolPanel::-webkit-scrollbar { width: 4px; }
+  #toolPanel::-webkit-scrollbar-track { background: transparent; }
+  #toolPanel::-webkit-scrollbar-thumb { background: #1a2d3d; border-radius: 10px; }
+
+  .panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 18px; border-bottom: 2px solid rgba(0, 240, 212, 0.1);
+    margin-bottom: 20px; position: sticky; top: 0;
+    background: linear-gradient(135deg, rgba(14, 22, 37, 0.98), rgba(10, 18, 30, 0.98));
+    backdrop-filter: blur(40px); z-index: 2;
+  }
+  .panel-title {
+    font-size: 20px; font-weight: 900; letter-spacing: 2px;
+    background: linear-gradient(135deg, #00f0d4, #a855f7, #f472b6);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; display: flex; align-items: center; gap: 10px;
+  }
+  .panel-close {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary); font-size: 16px; cursor: pointer;
+    transition: var(--transition);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .panel-close:hover {
+    background: rgba(248, 113, 113, 0.12);
+    border-color: rgba(248, 113, 113, 0.2);
+    color: var(--accent-red); transform: rotate(90deg);
+  }
+
+  .refresh-row {
+    display: flex; gap: 8px; margin-bottom: 14px; align-items: center;
+  }
+  .refresh-row .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-dim); flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .refresh-row .status-dot.live { background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
+  .refresh-row .status-dot.err { background: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
+  .refresh-row .status-dot.load { background: var(--accent-gold); box-shadow: 0 0 10px var(--accent-gold); }
+  .refresh-row .status-text {
+    font-size: 11px; color: var(--text-dim); flex: 1;
+    font-family: var(--font-mono); letter-spacing: 0.5px;
+  }
+
+  .btn-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .btn {
+    padding: 14px 18px; border: 2px solid transparent; border-radius: 14px;
+    font-weight: 800; font-size: 12px; cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    white-space: nowrap; font-family: inherit;
+    position: relative; overflow: hidden;
+  }
+  .btn-fetch {
+    flex: 1;
+    background: linear-gradient(135deg, #00f0d4, #a855f7, #f472b6);
+    color: #070b12; border-color: transparent;
+    box-shadow: 0 0 30px rgba(0, 240, 212, 0.3), 0 0 60px rgba(168, 85, 247, 0.2);
+    font-weight: 900;
+  }
+  .btn-fetch:hover {
+    transform: scale(1.03) translateY(-2px);
+    box-shadow: 0 0 50px rgba(0, 240, 212, 0.5), 0 0 80px rgba(168, 85, 247, 0.3);
+  }
+  .btn-fetch:active { transform: scale(0.97); }
+  .btn-fetch:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+  .btn-auto {
+    background: rgba(0, 240, 212, 0.1);
+    color: var(--accent-cyan);
+    border-color: rgba(0, 240, 212, 0.3);
+    min-width: 90px;
+  }
+  .btn-auto:hover {
+    background: rgba(0, 240, 212, 0.2);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 30px rgba(0, 240, 212, 0.3);
+  }
+  .btn-auto.on {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #fff; border-color: transparent;
+    box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
+  }
+
+  .result-panel {
+    background: linear-gradient(135deg, rgba(6, 12, 22, 0.9), rgba(10, 18, 30, 0.9));
+    border-radius: 18px; border: 2px solid rgba(0, 240, 212, 0.1);
+    padding: 24px 20px; min-height: 200px;
+    box-shadow: inset 0 4px 28px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 240, 212, 0.05);
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-align: center; position: relative; overflow: hidden;
+  }
+  .result-panel .placeholder {
+    color: var(--text-dim); font-size: 13px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    min-height: 150px;
+  }
+  .result-panel .placeholder .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-cyan); box-shadow: 0 0 14px var(--accent-cyan);
+    flex-shrink: 0; animation: pulseDot 1.6s ease-in-out infinite;
+  }
+
+  .session-info {
+    display: flex; justify-content: space-between;
+    padding: 10px 14px; background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px; margin-bottom: 14px;
+    font-size: 12px; border: 1px solid rgba(0, 240, 212, 0.08);
+  }
+  .session-info .lbl { color: var(--text-dim); }
+  .session-info .val { color: var(--accent-cyan); font-weight: 700; font-family: var(--font-mono); }
+
+  .dice-row {
+    display: flex; justify-content: center; gap: 12px;
+    margin: 12px 0 16px;
+  }
+  .dice {
+    width: 46px; height: 46px; border-radius: 10px;
+    background: linear-gradient(135deg, #1a2235, #0a121f);
+    border: 2px solid rgba(0, 240, 212, 0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 900; color: var(--accent-cyan);
+    font-family: var(--font-mono);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  }
+  .dice.total {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.05));
+    border-color: rgba(251, 191, 36, 0.4);
+    color: var(--accent-gold);
+  }
+  .dice.result-tai {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.05));
+    border-color: rgba(251, 191, 36, 0.4);
+    color: var(--accent-gold);
+  }
+  .dice.result-xiu {
+    background: linear-gradient(135deg, rgba(0, 240, 212, 0.2), rgba(0, 240, 212, 0.05));
+    border-color: rgba(0, 240, 212, 0.4);
+    color: var(--accent-cyan);
+  }
+
+  .prediction-block {
+    margin: 18px 0 12px;
+    padding: 18px 14px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 240, 212, 0.1);
+  }
+  .pred-label {
+    font-size: 11px; color: var(--text-dim); letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .pred-value {
+    font-size: 48px; font-weight: 900; letter-spacing: 6px;
+    line-height: 1;
+    animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes popIn {
+    0% { transform: scale(0.2) rotate(-6deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  .pred-value.tai {
+    color: var(--accent-gold);
+    text-shadow: 0 0 60px rgba(251, 191, 36, 0.6), 0 0 120px rgba(251, 191, 36, 0.15);
+  }
+  .pred-value.xiu {
+    color: var(--accent-cyan);
+    text-shadow: 0 0 60px rgba(0, 240, 212, 0.6), 0 0 120px rgba(0, 240, 212, 0.15);
+  }
+  .pred-percent {
+    font-size: 32px; font-weight: 900; margin-top: 6px;
+  }
+  .pred-percent.high { color: var(--accent-gold); }
+  .pred-percent.mid { color: #80cbc4; }
+  .pred-percent.low { color: var(--accent-red); }
+
+  .confidence-bar-wrap {
+    height: 10px; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    margin: 12px 0 14px; overflow: hidden;
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+  .confidence-bar-fill {
+    height: 100%; border-radius: 10px;
+    transition: width 1s cubic-bezier(0.23, 1, 0.32, 1);
+    background: linear-gradient(90deg, #00f0d4, #a855f7, #f472b6);
+    box-shadow: 0 0 24px rgba(0, 240, 212, 0.25); width: 0%;
+  }
+
+  .alert-warn {
+    background: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    border-radius: 12px; padding: 12px 16px;
+    color: var(--accent-red); font-size: 12px;
+    font-weight: 700; letter-spacing: 1px;
+    margin: 14px 0; text-align: center;
+    animation: pulseWarn 1.6s ease-in-out infinite;
+  }
+  .alert-ok {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 12px; padding: 12px 16px;
+    color: var(--accent-green); font-size: 12px;
+    font-weight: 700; letter-spacing: 1px;
+    margin: 14px 0; text-align: center;
+  }
+  @keyframes pulseWarn {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.3); }
+    50% { box-shadow: 0 0 20px 4px rgba(248, 113, 113, 0.15); }
+  }
+
+  .reasons-list {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    justify-content: center; margin-top: 10px;
+  }
+  .reason-chip {
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    border-radius: 20px; padding: 3px 12px;
+    font-size: 10px; color: var(--accent-purple);
+    font-weight: 600; font-family: var(--font-mono);
+  }
+
+  .result-meta {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 8px 16px; font-size: 11px; color: var(--text-dim); margin-top: 10px;
+  }
+  .result-meta .badge {
+    display: inline-block; background: rgba(0, 240, 212, 0.06);
+    padding: 3px 14px; border-radius: 20px;
+    border: 1px solid rgba(0, 240, 212, 0.12);
+    font-size: 9px; font-weight: 700; letter-spacing: 1px;
+    color: var(--accent-cyan);
+  }
+  .result-meta .badge-gold {
+    background: rgba(251, 191, 36, 0.06);
+    border-color: rgba(251, 191, 36, 0.15);
+    color: var(--accent-gold);
+  }
+  .result-meta .badge-red {
+    background: rgba(248, 113, 113, 0.06);
+    border-color: rgba(248, 113, 113, 0.15);
+    color: var(--accent-red);
+  }
+  .result-meta .badge-green {
+    background: rgba(34, 197, 94, 0.06);
+    border-color: rgba(34, 197, 94, 0.15);
+    color: var(--accent-green);
+  }
+
+  .panel-footer {
+    margin-top: 16px; padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    text-align: center; font-size: 9px; color: var(--text-dim);
+    letter-spacing: 1.5px; display: flex; justify-content: center;
+    align-items: center; gap: 8px; position: sticky; bottom: 0;
+    background: linear-gradient(135deg, rgba(14, 22, 37, 0.98), rgba(10, 18, 30, 0.98));
+    backdrop-filter: blur(40px);
+  }
+  .panel-footer .accent { color: var(--accent-cyan); }
+  .panel-footer .gold { color: var(--accent-gold); font-weight: 700; }
+
+  @media (max-width: 640px) {
+    .welcome-card { padding: 34px 22px 30px; }
+    .welcome-title { font-size: 30px; }
+    .welcome-icon { font-size: 54px; }
+    #toolPanel {
+      width: calc(100vw - 16px); max-width: 380px;
+      padding: 18px 14px 14px; top: 72px; left: 8px;
+      border-radius: 20px;
+    }
+    #toolToggle { font-size: 11px; padding: 10px 16px; top: 12px; left: 8px; }
+    .btn { padding: 10px 12px; font-size: 10px; }
+    .btn-fetch { padding: 10px 16px; }
+    .pred-value { font-size: 38px; }
+    .pred-percent { font-size: 26px; }
+    .dice { width: 38px; height: 38px; font-size: 18px; }
+    .lock-card { padding: 34px 22px 28px; }
+    .lock-title { font-size: 22px; }
+    .lock-icon { font-size: 48px; }
+  }
+
+  @media (max-width: 380px) {
+    .welcome-card { padding: 24px 16px 22px; }
+    .welcome-title { font-size: 24px; }
+    #toolPanel { padding: 14px 10px 12px; max-width: 320px; }
+    .pred-value { font-size: 30px; }
+    .pred-percent { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<iframe id="gameFrame" allow="camera; microphone; fullscreen; autoplay; encrypted-media; gyroscope; accelerometer" allowfullscreen webkitallowfullscreen mozallowfullscreen></iframe>
+
+<!-- MÀN HÌNH KHÓA -->
+<div id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">TOOL VIP</div>
+    <div class="lock-sub">NHẬP MẬT KHẨU ĐỂ SỬ DỤNG</div>
+    <input type="password" class="lock-input" id="lockInput" placeholder="••••••••" autocomplete="off">
+    <button class="lock-btn" id="lockBtn">🔓 MỞ KHÓA</button>
+    <div class="lock-msg" id="lockMsg"></div>
+  </div>
+</div>
+
+<div id="welcomeScreen" class="hidden">
+  <div class="welcome-card">
+    <div class="welcome-content">
+      <div class="welcome-badge">⚡ REALTIME 1.0</div>
+      <div class="welcome-icon">🎮</div>
+      <div class="welcome-title">TOOL VIP</div>
+      <div class="welcome-sub">Dữ liệu <span>Tool247</span></div>
+      <div class="welcome-version">Phiên bản <strong>REALTIME</strong> · Phiên + Dự đoán + Cảnh báo</div>
+      <div class="input-group">
+        <label>🌐 Đường dẫn game</label>
+        <div class="input-wrap">
+          <span class="input-icon">🔗</span>
+          <input type="text" id="linkInput" placeholder="https://play.lc79y.bet" value="https://play.lc79y.bet">
+        </div>
+      </div>
+      <button class="btn-primary" id="enterBtn">
+        <span class="shine"></span>
+        🚀 VÀO GAME
+      </button>
+      <div class="welcome-foot">💡 Nút <span class="hl">⚡ TOOL</span> xuất hiện sau khi vào</div>
+    </div>
+  </div>
+</div>
+
+<button id="toolToggle">
+  <span class="dot-live"></span>
+  ⚡ TOOL
+</button>
+
+<div id="toolPanel">
+  <div class="panel-header">
+    <span class="panel-title">📊 DỰ ĐOÁN REALTIME</span>
+    <button class="panel-close" id="panelClose">✕</button>
+  </div>
+
+  <div class="refresh-row">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">Nhấn LẤY DỰ ĐOÁN để bắt đầu</span>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-fetch" id="fetchBtn">⚡ LẤY DỰ ĐOÁN</button>
+    <button class="btn btn-auto" id="autoBtn">AUTO: TẮT</button>
+  </div>
+
+  <div class="result-panel" id="resultPanel">
+    <div class="placeholder">
+      <span class="dot"></span>
+      Nhấn <strong>LẤY DỰ ĐOÁN</strong> để lấy phiên + dự đoán
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <span class="accent">⚡</span>
+    Dữ liệu từ <span class="gold">Tool247</span> ·
+    <span class="accent">Realtime</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============ CẤU HÌNH ============ */
+  // Mật khẩu: baonamios (đã mã hóa base64 thành YmFvbmFtaW9z)
+  const _H = 'YmFvbmFtaW9z';
+
+  const API_URL = 'https://api.tool247.fun/lc79/api/md5';
+  const POLL_MS = 30000;
+
+  /* ============ DOM ============ */
+  const bgCanvas = document.getElementById('bgCanvas');
+  const ctx = bgCanvas.getContext('2d');
+  const gameFrame = document.getElementById('gameFrame');
+  const lockScreen = document.getElementById('lockScreen');
+  const lockInput = document.getElementById('lockInput');
+  const lockBtn = document.getElementById('lockBtn');
+  const lockMsg = document.getElementById('lockMsg');
+  const welcomeScreen = document.getElementById('welcomeScreen');
+  const linkInput = document.getElementById('linkInput');
+  const enterBtn = document.getElementById('enterBtn');
+  const toolToggle = document.getElementById('toolToggle');
+  const toolPanel = document.getElementById('toolPanel');
+  const panelClose = document.getElementById('panelClose');
+  const fetchBtn = document.getElementById('fetchBtn');
+  const autoBtn = document.getElementById('autoBtn');
+  const resultPanel = document.getElementById('resultPanel');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+
+  let isInGame = false;
+  let panelOpen = false;
+  let isFetching = false;
+  let autoOn = false;
+  let autoTimer = null;
+  let lastPhien = null;
+  let unlocked = false;
+
+  /* ============ CANVAS NỀN ============ */
+  let w, h;
+  const particles = [];
+  const NUM = 110;
+  let mouseX = -9999, mouseY = -9999, mouseActive = false;
+
+  function resizeCanvas() {
+    w = bgCanvas.width = window.innerWidth;
+    h = bgCanvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  class Particle {
+    constructor() { this.reset(); }
+    reset() {
+      this.x = Math.random() * w;
+      this.y = Math.random() * h;
+      this.vx = (Math.random() - 0.5) * 0.5;
+      this.vy = (Math.random() - 0.5) * 0.5;
+      this.radius = Math.random() * 2.2 + 0.6;
+      this.alpha = Math.random() * 0.5 + 0.15;
+      this.pulse = Math.random() * Math.PI * 2;
+      this.pulseSpeed = 0.008 + Math.random() * 0.012;
+    }
+    update() {
+      this.pulse += this.pulseSpeed;
+      const pf = 0.7 + 0.3 * Math.sin(this.pulse);
+      this.x += this.vx;
+      this.y += this.vy;
+      if (mouseActive) {
+        const dx = this.x - mouseX, dy = this.y - mouseY;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 200) {
+          const f = (200 - d) / 200 * 0.06;
+          this.x += dx * f;
+          this.y += dy * f;
+        }
+      }
+      if (this.x < 0 || this.x > w) { this.vx *= -1; this.x = Math.max(0, Math.min(w, this.x)); }
+      if (this.y < 0 || this.y > h) { this.vy *= -1; this.y = Math.max(0, Math.min(h, this.y)); }
+      return pf;
+    }
+    draw(pf) {
+      const a = this.alpha * pf;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius * pf, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0,240,212,${a * 0.5})`;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius * pf * 3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0,240,212,${a * 0.06})`;
+      ctx.fill();
+    }
+  }
+  for (let i = 0; i < NUM; i++) particles.push(new Particle());
+
+  function drawLines() {
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 160) {
+          const a = (1 - d / 160) * 0.15;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(0,240,212,${a})`;
+          ctx.lineWidth = 0.6;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, w, h);
+    for (const p of particles) p.draw(p.update());
+    drawLines();
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; mouseActive = true; });
+  document.addEventListener('mouseleave', () => { mouseActive = false; });
+  document.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    if (t) { mouseX = t.clientX; mouseY = t.clientY; mouseActive = true; }
+  }, { passive: true });
+
+  /* ============ TIỆN ÍCH ============ */
+  function setStatus(state, text) {
+    statusDot.className = 'status-dot ' + (state || '');
+    statusText.textContent = text;
+  }
+  function shake(el) { el.classList.add('error'); setTimeout(() => el.classList.remove('error'), 500); }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  /* ============ KHÓA ============ */
+  function checkLock() {
+    const val = lockInput.value.trim();
+    const expected = atob(_H);
+    if (val === expected) {
+      unlocked = true;
+      lockMsg.textContent = '✅ Mở khóa thành công';
+      lockMsg.className = 'lock-msg ok';
+      setTimeout(() => {
+        lockScreen.classList.add('hidden');
+        welcomeScreen.classList.remove('hidden');
+        lockInput.value = '';
+      }, 500);
+    } else {
+      lockMsg.textContent = '❌ Sai mật khẩu';
+      lockMsg.className = 'lock-msg err';
+      shake(lockInput);
+      lockInput.select();
+    }
+  }
+
+  lockBtn.addEventListener('click', checkLock);
+  lockInput.addEventListener('keypress', e => {
+    if (e.key === 'Enter') { e.preventDefault(); checkLock(); }
+  });
+
+  /* ============ VÀO GAME ============ */
+  function enterGame() {
+    const link = linkInput.value.trim();
+    if (!link || (!link.startsWith('http://') && !link.startsWith('https://'))) {
+      shake(linkInput);
+      linkInput.focus();
+      return;
+    }
+    gameFrame.src = link;
+    gameFrame.style.display = 'block';
+    isInGame = true;
+    welcomeScreen.classList.add('hidden');
+    setTimeout(() => {
+      toolToggle.classList.add('active');
+      setTimeout(() => {
+        toolPanel.classList.add('open');
+        panelOpen = true;
+      }, 400);
+    }, 500);
+  }
+
+  enterBtn.addEventListener('click', enterGame);
+  linkInput.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); enterGame(); } });
+
+  /* ============ TOGGLE PANEL ============ */
+  toolToggle.addEventListener('click', () => {
+    if (!isInGame) { welcomeScreen.classList.remove('hidden'); linkInput.focus(); return; }
+    toolPanel.classList.toggle('open');
+    panelOpen = toolPanel.classList.contains('open');
+  });
+  panelClose.addEventListener('click', () => { toolPanel.classList.remove('open'); panelOpen = false; });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && panelOpen) { toolPanel.classList.remove('open'); panelOpen = false; }
+  });
+
+  /* ============ LẤY DỰ ĐOÁN ============ */
+  async function fetchPrediction() {
+    if (isFetching) return;
+    isFetching = true;
+    fetchBtn.disabled = true;
+    fetchBtn.textContent = '⏳ ĐANG LẤY...';
+    setStatus('load', 'Đang gọi API...');
+
+    try {
+      const res = await fetch(API_URL + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      renderResult(data);
+      lastPhien = data.phien;
+      const now = new Date().toLocaleTimeString('vi-VN');
+      setStatus('live', 'Cập nhật lúc ' + now);
+    } catch (err) {
+      setStatus('err', 'Lỗi: ' + err.message);
+      resultPanel.innerHTML = '<div class="placeholder" style="color:var(--accent-red)">❌ Lỗi kết nối API<br><span style="font-size:11px;color:var(--text-dim)">' + escapeHtml(err.message) + '</span></div>';
+    } finally {
+      isFetching = false;
+      fetchBtn.disabled = false;
+      fetchBtn.textContent = '⚡ LẤY DỰ ĐOÁN';
+    }
+  }
+
+  /* ============ HIỂN THỊ ============ */
+  function renderResult(d) {
+    const phien = d.phien || '—';
+    const phienTiep = d.phien_tiep || '—';
+    const x1 = d.xuc_xac1, x2 = d.xuc_xac2, x3 = d.xuc_xac3;
+    const tong = d.tong;
+    const ketQua = d.ket_qua || '—';
+    const duDoan = d.du_doan || '—';
+    const tinCay = d.do_tin_cay || 0;
+    const loaiCau = d.loai_cau || '';
+    const lyDo = d.ly_do || [];
+    const nenCuoc = d.nen_cuoc;
+    const biasRate = d.bias_rate;
+    const thoiGian = d.thoi_gian || '';
+    const meta = d._meta || {};
+
+    const isTai = duDoan === 'Tài';
+    const predClass = isTai ? 'tai' : 'xiu';
+    const emoji = isTai ? '🔴' : '🔵';
+
+    let confClass = 'low';
+    if (tinCay >= 80) confClass = 'high';
+    else if (tinCay >= 65) confClass = 'mid';
+
+    const kqClass = ketQua === 'Tài' ? 'result-tai' : 'result-xiu';
+
+    let html = '';
+
+    html += `<div class="session-info">
+      <span><span class="lbl">Phiên vừa:</span> <span class="val">#${phien}</span></span>
+      <span><span class="lbl">Phiên tới:</span> <span class="val">#${phienTiep}</span></span>
+    </div>`;
+
+    html += `<div class="dice-row">
+      <div class="dice">${x1}</div>
+      <div class="dice">${x2}</div>
+      <div class="dice">${x3}</div>
+      <div class="dice total">${tong}</div>
+      <div class="dice ${kqClass}">${ketQua === 'Tài' ? 'T' : 'X'}</div>
+    </div>`;
+
+    html += `<div class="prediction-block">
+      <div class="pred-label">Dự đoán phiên #${phienTiep}</div>
+      <div class="pred-value ${predClass}">${emoji} ${duDoan}</div>
+      <div class="pred-percent ${confClass}">${tinCay}%</div>
+      <div class="confidence-bar-wrap"><div class="confidence-bar-fill" id="confFill" style="width:0%"></div></div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:6px">${escapeHtml(loaiCau)}</div>
+    </div>`;
+
+    if (nenCuoc === false) {
+      html += `<div class="alert-warn">⚠️ TOOL KHUYẾN NGHỊ KHÔNG NÊN CƯỢC PHIÊN NÀY</div>`;
+    } else if (nenCuoc === true) {
+      html += `<div class="alert-ok">✅ TOOL KHUYẾN NGHỊ CÓ THỂ CƯỢC</div>`;
+    }
+
+    if (lyDo.length) {
+      html += `<div class="reasons-list">`;
+      lyDo.forEach(r => { html += `<span class="reason-chip">${escapeHtml(r)}</span>`; });
+      html += `</div>`;
+    }
+
+    html += `<div class="result-meta" style="margin-top:14px">`;
+    if (biasRate !== undefined) {
+      const biasClass = biasRate > 50 ? 'badge-red' : 'badge-green';
+      html += `<span class="badge ${biasClass}">Bias ${biasRate}%</span>`;
+    }
+    if (meta.agreement !== undefined) {
+      html += `<span class="badge">Đồng thuận ${(meta.agreement * 100).toFixed(1)}%</span>`;
+    }
+    if (meta.votes) {
+      html += `<span class="badge badge-gold">T:${meta.votes.T?.toFixed(1) || 0} X:${meta.votes.X?.toFixed(1) || 0}</span>`;
+    }
+    if (meta.vc) {
+      html += `<span class="badge">Vote T:${meta.vc.T} X:${meta.vc.X}</span>`;
+    }
+    if (meta.streak !== undefined) {
+      html += `<span class="badge">Chuỗi ${meta.streak}</span>`;
+    }
+    html += `<span class="badge">${thoiGian}</span>`;
+    html += `</div>`;
+
+    resultPanel.innerHTML = html;
+
+    setTimeout(() => {
+      const fill = document.getElementById('confFill');
+      if (fill) setTimeout(() => { fill.style.width = tinCay + '%'; }, 60);
+    }, 100);
+  }
+
+  /* ============ NÚT ============ */
+  fetchBtn.addEventListener('click', fetchPrediction);
+
+  autoBtn.addEventListener('click', () => {
+    if (autoOn) {
+      clearInterval(autoTimer);
+      autoOn = false;
+      autoBtn.textContent = 'AUTO: TẮT';
+      autoBtn.classList.remove('on');
+      setStatus('', 'Đã dừng tự động');
+    } else {
+      autoTimer = setInterval(fetchPrediction, POLL_MS);
+      autoOn = true;
+      autoBtn.textContent = 'AUTO: BẬT (30s)';
+      autoBtn.classList.add('on');
+      fetchPrediction();
+    }
+  });
+
+  /* ============ CHỐNG ZOOM ============ */
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('gesturechange', e => e.preventDefault());
+  document.addEventListener('gestureend', e => e.preventDefault());
+
+})();
+</script>
+</body>
+</html>
